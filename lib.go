@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -62,24 +63,24 @@ func GetFileHeadersFromLambdaReq(lambdaReq events.APIGatewayProxyRequest) ([]*mu
 	return files, http.StatusOK, nil
 }
 
-func UploadFileHeaderToS3(fileHeader *multipart.FileHeader, region, bucket, name string) (string, int, error) {
+func UploadFileHeaderToS3(fileHeader *multipart.FileHeader, region, bucket, name string) (string, string, int, error) {
 	if region == "" {
-		return "", http.StatusBadRequest, fmt.Errorf("cannot upload to S3 with missing required parameter region [%s]", region)
+		return "", "", http.StatusBadRequest, fmt.Errorf("cannot upload to S3 with missing required parameter region [%s]", region)
 	}
 
 	if bucket == "" {
-		return "", http.StatusBadRequest, fmt.Errorf("cannot upload to S3 with missing required parameter bucket [%s]", bucket)
+		return "", "", http.StatusBadRequest, fmt.Errorf("cannot upload to S3 with missing required parameter bucket [%s]", bucket)
 	}
 
 	file, err := fileHeader.Open()
 	if err != nil {
-		return "", http.StatusInternalServerError, err
+		return "", "", http.StatusInternalServerError, err
 	}
 
 	var fileContents []byte
 	_, err = file.Read(fileContents)
 	if err != nil {
-		return "", http.StatusInternalServerError, err
+		return "", "", http.StatusInternalServerError, err
 	}
 
 	// https://stackoverflow.com/q/47621804/584947
@@ -95,10 +96,10 @@ func UploadFileHeaderToS3(fileHeader *multipart.FileHeader, region, bucket, name
 		Body:   file,
 	})
 	if err != nil {
-		return "", http.StatusInternalServerError, err
+		return "", "", http.StatusInternalServerError, err
 	}
 
-	return uploadOutput.Location, http.StatusOK, nil
+	return filepath.Join(bucket, name), uploadOutput.Location, http.StatusOK, nil
 }
 
 func DownloadFileFromS3(region, bucket, name string) ([]byte, int, error) {
