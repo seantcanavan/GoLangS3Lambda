@@ -9,10 +9,6 @@ Upload or Download files from AWS S3 with one function through AWS Lambda and AW
 2. `nano .env` insert real values for each environment variable
 3. `make test`
 
-## All tests are passing
-```
-```
-
 ## How to Use
 1. `go get github.com/seantcanavan/lambda_s3@latest`
 2. `import github.com/seantcanavan/lambda_s3`
@@ -102,4 +98,42 @@ func DownloadLambda(ctx context.Context, lambdaReq events.APIGatewayProxyRequest
 		IsBase64Encoded: true,
 	}, nil
 }
+```
+
+## All tests are passing
+```
+Thu Jan 19 03:51 PM lambda_s3: make test
+go test -v
+=== RUN   TestGetFileHeadersFromLambdaReq
+--- PASS: TestGetFileHeadersFromLambdaReq (0.00s)
+=== RUN   TestDownloadFileFromS3
+=== RUN   TestDownloadFileFromS3/verify_err_when_region_is_empty
+=== RUN   TestDownloadFileFromS3/verify_err_when_bucket_is_empty
+=== RUN   TestDownloadFileFromS3/verify_err_when_name_is_empty
+=== RUN   TestDownloadFileFromS3/verify_err_when_region_is_invalid
+=== RUN   TestDownloadFileFromS3/verify_err_when_target_file_is_empty
+=== RUN   TestDownloadFileFromS3/verify_download_works_with_correct_inputs
+--- PASS: TestDownloadFileFromS3 (0.86s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_empty (0.00s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_bucket_is_empty (0.00s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_name_is_empty (0.00s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_invalid (0.49s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_target_file_is_empty (0.30s)
+    --- PASS: TestDownloadFileFromS3/verify_download_works_with_correct_inputs (0.06s)
+=== RUN   TestUploadFileHeaderToS3
+=== RUN   TestUploadFileHeaderToS3/verify_err_when_region_is_empty
+=== RUN   TestUploadFileHeaderToS3/verify_err_when_bucket_is_empty
+=== RUN   TestUploadFileHeaderToS3/verify_err_when_name_is_empty
+=== RUN   TestUploadFileHeaderToS3/verify_err_when_*multipart.FileHeader_is_empty
+=== RUN   TestUploadFileHeaderToS3/verify_err_when_region_is_invalid_and_upload_fails
+=== RUN   TestUploadFileHeaderToS3/verify_upload_works_with_correct_inputs
+--- PASS: TestUploadFileHeaderToS3 (0.61s)
+    --- PASS: TestUploadFileHeaderToS3/verify_err_when_region_is_empty (0.00s)
+    --- PASS: TestUploadFileHeaderToS3/verify_err_when_bucket_is_empty (0.00s)
+    --- PASS: TestUploadFileHeaderToS3/verify_err_when_name_is_empty (0.00s)
+    --- PASS: TestUploadFileHeaderToS3/verify_err_when_*multipart.FileHeader_is_empty (0.00s)
+    --- PASS: TestUploadFileHeaderToS3/verify_err_when_region_is_invalid_and_upload_fails (0.55s)
+    --- PASS: TestUploadFileHeaderToS3/verify_upload_works_with_correct_inputs (0.06s)
+PASS
+ok  	github.com/seantcanavan/lambda_s3	1.470s
 ```
