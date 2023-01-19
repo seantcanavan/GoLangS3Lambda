@@ -2,17 +2,19 @@ package golang_s3_lambda
 
 import (
 	"bytes"
-	"crypto/rand"
+	"errors"
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/jgroeneveld/trial/assert"
 	"github.com/joho/godotenv"
 	"log"
-	"math/big"
 	"mime/multipart"
-	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -21,6 +23,7 @@ const Name = "file_slash_key_name"
 const Bucket = "golang-s3-lambda-test"
 const BoundaryValue = "---SEAN_BOUNDARY_VALUE"
 const SampleFile = "sample_file.csv"
+const EmptyFile = "empty_file.txt"
 const SampleFileBytes = 369
 
 func TestMain(m *testing.M) {
@@ -36,33 +39,137 @@ func setup() {
 }
 
 func TestGetFileHeadersFromLambdaReq(t *testing.T) {
-	lambdaReq := generateRandomAPIGatewayProxyRequest()
+	lambdaReq := generateUploadFileReq()
 
-	fileHeaders, httpStatus, err := GetFileHeadersFromLambdaReq(lambdaReq)
+	fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
 	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, httpStatus)
 	assert.Equal(t, 1, len(fileHeaders))
 }
 
 func TestDownloadFileFromS3(t *testing.T) {
+	t.Run("verify err when region is empty", func(t *testing.T) {
+		fileBytes, err := DownloadFileFromS3("", Bucket, Name)
+		assert.Equal(t, len(fileBytes), 0)
+		assert.True(t, errors.Is(err, ErrParameterRegionEmpty))
+	})
+	t.Run("verify err when bucket is empty", func(t *testing.T) {
+		fileBytes, err := DownloadFileFromS3(Region, "", Name)
+		assert.Equal(t, len(fileBytes), 0)
+		assert.True(t, errors.Is(err, ErrParameterBucketEmpty))
+	})
+	t.Run("verify err when name is empty", func(t *testing.T) {
+		fileBytes, err := DownloadFileFromS3(Region, Bucket, "")
+		assert.Equal(t, len(fileBytes), 0)
+		assert.True(t, errors.Is(err, ErrParameterNameEmpty))
+	})
+	t.Run("verify err when region is invalid", func(t *testing.T) {
+		fileBytes, err := DownloadFileFromS3("us-east-sean", Bucket, Name)
+		assert.Equal(t, len(fileBytes), 0)
+		assert.True(t, errors.Is(err, ErrDownloadingS3File))
+	})
+	t.Run("verify err when target file is empty", func(t *testing.T) {
+		// first upload a totally empty file
+		awsSession, err := session.NewSession(&aws.Config{
+			Region: aws.String(Region)},
+		)
+		assert.Nil(t, err)
 
+		uploader := s3manager.NewUploader(awsSession)
+
+		emptyFile, err := os.Open(EmptyFile)
+		assert.Nil(t, err)
+
+		_, err = uploader.Upload(&s3manager.UploadInput{
+			Bucket: aws.String(Bucket),
+			Key:    aws.String(EmptyFile),
+			Body:   emptyFile,
+		})
+		assert.Nil(t, err)
+
+		fileBytes, err := DownloadFileFromS3(Region, Bucket, EmptyFile)
+		assert.Equal(t, len(fileBytes), 0)
+		assert.True(t, errors.Is(err, ErrEmptyFileDownloaded))
+	})
+	t.Run("verify download works with correct inputs", func(t *testing.T) {
+		fileBytes, err := DownloadFileFromS3(Region, Bucket, Name)
+		assert.Equal(t, len(fileBytes), SampleFileBytes)
+		assert.Nil(t, err)
+	})
 }
 
 func TestUploadFileHeaderToS3(t *testing.T) {
-	lambdaReq := generateRandomAPIGatewayProxyRequest()
+	t.Run("verify err when region is empty", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
 
-	fileHeaders, httpStatus, err := GetFileHeadersFromLambdaReq(lambdaReq)
-	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, httpStatus)
-	assert.Equal(t, 1, len(fileHeaders))
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(fileHeaders))
 
-	s3Path, httpStatus, err := UploadFileHeaderToS3(fileHeaders[0], Region, Bucket, Name)
-	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, httpStatus)
-	assert.Equal(t, filepath.Join(Bucket, Name), s3Path)
+		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], "", Bucket, Name)
+		assert.Equal(t, uploadRes, (*UploadRes)(nil))
+		assert.True(t, errors.Is(err, ErrParameterRegionEmpty))
+	})
+	t.Run("verify err when bucket is empty", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(fileHeaders))
+
+		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], Region, "", Name)
+		assert.Equal(t, uploadRes, (*UploadRes)(nil))
+		assert.True(t, errors.Is(err, ErrParameterBucketEmpty))
+	})
+	t.Run("verify err when name is empty", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(fileHeaders))
+
+		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], Region, Bucket, "")
+		assert.Equal(t, uploadRes, (*UploadRes)(nil))
+		assert.True(t, errors.Is(err, ErrParameterNameEmpty))
+	})
+	t.Run("verify err when *multipart.FileHeader is empty", func(t *testing.T) {
+		uploadRes, err := UploadFileHeaderToS3(&multipart.FileHeader{}, Region, Bucket, Name)
+		assert.Equal(t, uploadRes, (*UploadRes)(nil))
+		assert.True(t, errors.Is(err, ErrOpeningMultiPartFile))
+	})
+	t.Run("verify err when region is invalid and upload fails", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(fileHeaders))
+
+		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], "us-east-sean", Bucket, Name)
+		assert.Equal(t, uploadRes, (*UploadRes)(nil))
+		assert.True(t, errors.Is(err, ErrUploadingMultiPartFileToS3))
+	})
+	t.Run("verify upload works with correct inputs", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(fileHeaders))
+
+		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], Region, Bucket, Name)
+		assert.Nil(t, err)
+		assert.Equal(t, filepath.Join(Bucket, Name), uploadRes.S3Path)
+
+		var urlBuilder strings.Builder
+		urlBuilder.WriteString("https://")
+		urlBuilder.WriteString(Bucket)
+		urlBuilder.WriteString(".s3.")
+		urlBuilder.WriteString(Region)
+		urlBuilder.WriteString(".amazonaws.com/")
+		urlBuilder.WriteString(Name)
+		assert.Equal(t, urlBuilder.String(), uploadRes.S3URL)
+	})
 }
 
-func generateRandomAPIGatewayProxyRequest() events.APIGatewayProxyRequest {
+func generateUploadFileReq() events.APIGatewayProxyRequest {
 	fileBytes, readErr := os.ReadFile(SampleFile)
 	if readErr != nil {
 		fmt.Println(fmt.Sprintf("readErr [%+v]", readErr))
@@ -109,62 +216,8 @@ func generateRandomAPIGatewayProxyRequest() events.APIGatewayProxyRequest {
 	contentType := writer.FormDataContentType()
 
 	return events.APIGatewayProxyRequest{
-		Resource:                        generateRandomString(10),
-		Path:                            generateRandomString(10),
-		HTTPMethod:                      generateRandomString(10),
-		Headers:                         map[string]string{"Content-Type": contentType},
-		MultiValueHeaders:               map[string][]string{"multiValueHeaders": {"hello there"}},
-		QueryStringParameters:           map[string]string{"queryStringParameters": "value"},
-		MultiValueQueryStringParameters: map[string][]string{"multiValueQueryStringParameters": {"hello there"}},
-		PathParameters:                  map[string]string{"pathParameters": "value"},
-		StageVariables:                  map[string]string{"stageVariables": "value"},
-		RequestContext: events.APIGatewayProxyRequestContext{
-			AccountID:     generateRandomString(10),
-			ResourceID:    generateRandomString(10),
-			OperationName: generateRandomString(10),
-			Stage:         generateRandomString(10),
-			DomainName:    generateRandomString(10),
-			DomainPrefix:  generateRandomString(10),
-			RequestID:     generateRandomString(10),
-			Protocol:      generateRandomString(10),
-			Identity: events.APIGatewayRequestIdentity{
-				CognitoIdentityPoolID:         generateRandomString(10),
-				AccountID:                     generateRandomString(10),
-				CognitoIdentityID:             generateRandomString(10),
-				Caller:                        generateRandomString(10),
-				APIKey:                        generateRandomString(10),
-				APIKeyID:                      generateRandomString(10),
-				AccessKey:                     generateRandomString(10),
-				SourceIP:                      generateRandomString(10),
-				CognitoAuthenticationType:     generateRandomString(10),
-				CognitoAuthenticationProvider: generateRandomString(10),
-				UserArn:                       generateRandomString(10),
-				UserAgent:                     generateRandomString(10),
-				User:                          generateRandomString(10),
-			},
-			ResourcePath:     generateRandomString(10),
-			Path:             generateRandomString(10),
-			Authorizer:       map[string]interface{}{"hi there": "sean"},
-			HTTPMethod:       generateRandomString(10),
-			RequestTime:      generateRandomString(10),
-			RequestTimeEpoch: 0,
-			APIID:            generateRandomString(10),
-		},
+		Headers:         map[string]string{"Content-Type": contentType},
 		Body:            string(multiPartBytes.Bytes()),
 		IsBase64Encoded: false,
 	}
-}
-
-func generateRandomString(length int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	ret := make([]byte, length)
-	for i := 0; i < length; i++ {
-		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
-		if err != nil {
-			return ""
-		}
-		ret[i] = letters[num.Int64()]
-	}
-
-	return string(ret)
 }
