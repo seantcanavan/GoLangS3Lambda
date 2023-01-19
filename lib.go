@@ -2,7 +2,6 @@ package golang_s3_lambda
 
 import (
 	"errors"
-	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -10,24 +9,18 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"mime"
 	"mime/multipart"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 )
-
-const DefaultMaxFileSizeBytes = 50000000 // 50 megabytes
-const MaxFileSizeBytes = "MAX_FILE_SIZE_BYTES"
 
 var ErrContentTypeHeaderMissing = errors.New("request contained no Content-Type header")
 var ErrParsingMediaType = errors.New("error parsing media type from Content-Type header. Make sure your request is formatted correctly")
 var ErrBoundaryValueMissing = errors.New("request contained no boundary value in the Content-Type header")
-var ErrParsingMaxFileSizeBytes = fmt.Errorf("env variable [%s] was set but unable to be parsed as a base 10 int64 value", MaxFileSizeBytes)
-var ErrReadingMultiPartForm = fmt.Errorf("reading of multipart form failed. verify input size is <= [%s]", MaxFileSizeBytes)
+var ErrReadingMultiPartForm = errors.New("reading of multipart form failed. verify input size is <= maxFileSizeBytes")
 
 // GetFileHeadersFromLambdaReq accepts a lambda request directly from AWS Lambda after it has been proxied through
 // API Gateway. It returns an array of *multipart.FileHeader values. One for each file uploaded to Lambda.
-func GetFileHeadersFromLambdaReq(lambdaReq events.APIGatewayProxyRequest) ([]*multipart.FileHeader, error) {
+func GetFileHeadersFromLambdaReq(lambdaReq events.APIGatewayProxyRequest, maxFileSizeBytes int64) ([]*multipart.FileHeader, error) {
 	//parse the lambda body
 	contentType := lambdaReq.Headers["Content-Type"]
 	if contentType == "" {
@@ -46,17 +39,6 @@ func GetFileHeadersFromLambdaReq(lambdaReq events.APIGatewayProxyRequest) ([]*mu
 
 	stringReader := strings.NewReader(lambdaReq.Body)
 	multipartReader := multipart.NewReader(stringReader, boundary)
-
-	var maxFileSizeBytes int64
-	maxFileSizeBytesStr := os.Getenv("MAX_FILE_SIZE_BYTES")
-	if maxFileSizeBytesStr == "" {
-		maxFileSizeBytes = DefaultMaxFileSizeBytes
-	} else {
-		maxFileSizeBytes, err = strconv.ParseInt(maxFileSizeBytesStr, 10, 64)
-		if err != nil {
-			return nil, ErrParsingMaxFileSizeBytes
-		}
-	}
 
 	form, err := multipartReader.ReadForm(maxFileSizeBytes)
 	if err != nil {

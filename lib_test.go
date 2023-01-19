@@ -25,6 +25,7 @@ const BoundaryValue = "---SEAN_BOUNDARY_VALUE"
 const SampleFile = "sample_file.csv"
 const EmptyFile = "empty_file.txt"
 const SampleFileBytes = 369
+const MaxFileSizeBytes = 50000000 // 50 megabytes
 
 func TestMain(m *testing.M) {
 	setup()
@@ -41,7 +42,7 @@ func setup() {
 func TestGetFileHeadersFromLambdaReq(t *testing.T) {
 	lambdaReq := generateUploadFileReq()
 
-	fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+	fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
 	assert.Nil(t, err)
 	assert.Equal(t, 1, len(fileHeaders))
 }
@@ -101,7 +102,7 @@ func TestUploadFileHeaderToS3(t *testing.T) {
 	t.Run("verify err when region is empty", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
@@ -112,7 +113,7 @@ func TestUploadFileHeaderToS3(t *testing.T) {
 	t.Run("verify err when bucket is empty", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
@@ -123,7 +124,7 @@ func TestUploadFileHeaderToS3(t *testing.T) {
 	t.Run("verify err when name is empty", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
@@ -139,7 +140,7 @@ func TestUploadFileHeaderToS3(t *testing.T) {
 	t.Run("verify err when region is invalid and upload fails", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
@@ -150,7 +151,7 @@ func TestUploadFileHeaderToS3(t *testing.T) {
 	t.Run("verify upload works with correct inputs", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq)
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
