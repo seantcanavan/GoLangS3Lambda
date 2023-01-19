@@ -81,9 +81,9 @@ func DownloadLambda(ctx context.Context, lambdaReq events.APIGatewayProxyRequest
 			errors.Is(err, lambda_s3.ErrParameterBucketEmpty),
 			errors.Is(err, lambda_s3.ErrParameterNameEmpty),
 			errors.Is(err, lambda_s3.ErrEmptyFileDownloaded):
-			return lmdrouter.HandleHTTPError(http.StatusBadRequest, err)
+			return ERROR - bad request
 		default:
-			return lmdrouter.HandleHTTPError(http.StatusInternalServerError, err)
+			return ERROR - internal server
 		}
 	}
 
@@ -100,10 +100,19 @@ func DownloadLambda(ctx context.Context, lambdaReq events.APIGatewayProxyRequest
 
 ## All tests are passing
 ```
-Thu Jan 19 03:51 PM lambda_s3: make test
+ func TestDownloadFileFromS3(t *testing.T) {
+Thu Jan 19 05:39 PM lambda_s3: make test
 go test -v
 === RUN   TestGetFileHeadersFromLambdaReq
+=== RUN   TestGetFileHeadersFromLambdaReq/verify_err_when_Content-Type_header_not_set
+=== RUN   TestGetFileHeadersFromLambdaReq/verify_err_when_content_type_is_invalid
+=== RUN   TestGetFileHeadersFromLambdaReq/verify_err_when_content_type_has_no_boundary_value
+=== RUN   TestGetFileHeadersFromLambdaReq/verify_get_headers_works_with_correct_inputs
 --- PASS: TestGetFileHeadersFromLambdaReq (0.00s)
+    --- PASS: TestGetFileHeadersFromLambdaReq/verify_err_when_Content-Type_header_not_set (0.00s)
+    --- PASS: TestGetFileHeadersFromLambdaReq/verify_err_when_content_type_is_invalid (0.00s)
+    --- PASS: TestGetFileHeadersFromLambdaReq/verify_err_when_content_type_has_no_boundary_value (0.00s)
+    --- PASS: TestGetFileHeadersFromLambdaReq/verify_get_headers_works_with_correct_inputs (0.00s)
 === RUN   TestDownloadFileFromS3
 === RUN   TestDownloadFileFromS3/verify_err_when_region_is_empty
 === RUN   TestDownloadFileFromS3/verify_err_when_bucket_is_empty
@@ -111,13 +120,13 @@ go test -v
 === RUN   TestDownloadFileFromS3/verify_err_when_region_is_invalid
 === RUN   TestDownloadFileFromS3/verify_err_when_target_file_is_empty
 === RUN   TestDownloadFileFromS3/verify_download_works_with_correct_inputs
---- PASS: TestDownloadFileFromS3 (0.86s)
+--- PASS: TestDownloadFileFromS3 (0.99s)
     --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_empty (0.00s)
     --- PASS: TestDownloadFileFromS3/verify_err_when_bucket_is_empty (0.00s)
     --- PASS: TestDownloadFileFromS3/verify_err_when_name_is_empty (0.00s)
-    --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_invalid (0.49s)
-    --- PASS: TestDownloadFileFromS3/verify_err_when_target_file_is_empty (0.30s)
-    --- PASS: TestDownloadFileFromS3/verify_download_works_with_correct_inputs (0.06s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_invalid (0.57s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_target_file_is_empty (0.32s)
+    --- PASS: TestDownloadFileFromS3/verify_download_works_with_correct_inputs (0.10s)
 === RUN   TestUploadFileHeaderToS3
 === RUN   TestUploadFileHeaderToS3/verify_err_when_region_is_empty
 === RUN   TestUploadFileHeaderToS3/verify_err_when_bucket_is_empty
@@ -125,13 +134,13 @@ go test -v
 === RUN   TestUploadFileHeaderToS3/verify_err_when_*multipart.FileHeader_is_empty
 === RUN   TestUploadFileHeaderToS3/verify_err_when_region_is_invalid_and_upload_fails
 === RUN   TestUploadFileHeaderToS3/verify_upload_works_with_correct_inputs
---- PASS: TestUploadFileHeaderToS3 (0.61s)
+--- PASS: TestUploadFileHeaderToS3 (0.55s)
     --- PASS: TestUploadFileHeaderToS3/verify_err_when_region_is_empty (0.00s)
     --- PASS: TestUploadFileHeaderToS3/verify_err_when_bucket_is_empty (0.00s)
     --- PASS: TestUploadFileHeaderToS3/verify_err_when_name_is_empty (0.00s)
     --- PASS: TestUploadFileHeaderToS3/verify_err_when_*multipart.FileHeader_is_empty (0.00s)
-    --- PASS: TestUploadFileHeaderToS3/verify_err_when_region_is_invalid_and_upload_fails (0.55s)
+    --- PASS: TestUploadFileHeaderToS3/verify_err_when_region_is_invalid_and_upload_fails (0.49s)
     --- PASS: TestUploadFileHeaderToS3/verify_upload_works_with_correct_inputs (0.06s)
 PASS
-ok  	github.com/seantcanavan/lambda_s3	1.470s
+ok  	github.com/seantcanavan/lambda_s3	1.538s
 ```

@@ -40,11 +40,37 @@ func setup() {
 }
 
 func TestGetFileHeadersFromLambdaReq(t *testing.T) {
-	lambdaReq := generateUploadFileReq()
+	t.Run("verify err when Content-Type header not set", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+		lambdaReq.Headers = map[string]string{}
 
-	fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
-	assert.Nil(t, err)
-	assert.Equal(t, 1, len(fileHeaders))
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		assert.Equal(t, len(fileHeaders), 0)
+		assert.True(t, errors.Is(err, ErrContentTypeHeaderMissing))
+	})
+	t.Run("verify err when content type is invalid", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+		lambdaReq.Headers = map[string]string{"Content-Type": ";;;;;;;;;"}
+
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		assert.Equal(t, len(fileHeaders), 0)
+		assert.True(t, errors.Is(err, ErrParsingMediaType))
+	})
+	t.Run("verify err when content type has no boundary value", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+		lambdaReq.Headers = map[string]string{"Content-Type": "blah"}
+
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		assert.Equal(t, len(fileHeaders), 0)
+		assert.True(t, errors.Is(err, ErrBoundaryValueMissing))
+	})
+	t.Run("verify get headers works with correct inputs", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+
+		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(fileHeaders))
+	})
 }
 
 func TestDownloadFileFromS3(t *testing.T) {
