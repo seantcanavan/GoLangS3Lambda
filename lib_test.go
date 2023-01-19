@@ -1,4 +1,4 @@
-package golang_s3_lambda
+package lambda_s3
 
 import (
 	"bytes"
