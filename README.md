@@ -13,12 +13,10 @@ Upload or Download files from AWS S3 with one function through AWS Lambda and AW
 1. `go get github.com/seantcanavan/lambda_s3@latest`
 2. `import github.com/seantcanavan/lambda_s3`
 3. Get the file headers uploaded via AWS Lambda / API Gateway: `headers, err := lambda_s3.GetFileHeadersFromLambdaReq()`
-   1. Use `errors.Is` to check for different error cases returned from `GetFileHeadersFromLambdaReq()`
-4. Upload the file uploaded file contents via the file headers: `lambda_s3.UploadFileHeaderToS3()`
-   1. Use `errors.Is` to check for different error cases returned from `UploadFileHeaderToS3()`
+4. Upload the uploaded file contents via the file headers: `lambda_s3.UploadFileHeaderToS3()`
 5. Download the file contents via the file's bucket/key combination: `lambda_s3.DownloadFileFromS3()`
-   1. Use `errors.Is` to check for different error cases returned from `DownloadFileFromS3()`
-
+6. Use `errors.Is` to check for different error cases returned from `GetFileHeadersFromLambdaReq`, `UploadFileHeaderToS3`, and `DownloadFileFromS3`
+   1. Check below for sample code on how to implement the functions and use `errors.Is`
 
 ## Sample Upload Lambda Handler Example
 ``` go
