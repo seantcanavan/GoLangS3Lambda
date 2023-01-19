@@ -1,4 +1,4 @@
-module github.com/seantcanavan/golang_s3_lambda
+module github.com/seantcanavan/lambda_s3
 
 go 1.18
 
