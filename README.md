@@ -1,4 +1,4 @@
-# GoLangS3Lambda
+# Lambda S3
 Upload or Download files from AWS S3 with one function through AWS Lambda and AWS APIGateway.
 
 ## How to Build locally
