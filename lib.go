@@ -18,19 +18,21 @@ import (
 	"strings"
 )
 
-var ErrBoundaryValueMissing = errors.New("request contained no boundary value in the Content-Type header")
-var ErrContentTypeHeaderMissing = errors.New("request contained no Content-Type header")
-var ErrDownloadingS3File = errors.New("unable to download the given file from S3")
-var ErrEmptyFileDownloaded = errors.New("the provided S3 file to download is empty")
-var ErrNewAWSSession = errors.New("error creating new AWS Session")
-var ErrOpeningMultiPartFile = errors.New("unable to open *multipart.FileHeader")
-var ErrParameterBucketEmpty = errors.New("required parameter bucket is empty")
-var ErrParameterNameEmpty = errors.New("required parameter name is empty")
-var ErrParameterRegionEmpty = errors.New("required parameter region is empty")
-var ErrParsingMediaType = errors.New("error parsing media type from Content-Type header. Make sure your request is formatted correctly")
-var ErrReadingMultiPartFile = errors.New("unable to read *multipart.FileHeader")
-var ErrReadingMultiPartForm = errors.New("reading of multipart form failed. verify input size is <= maxFileSizeBytes")
-var ErrUploadingMultiPartFileToS3 = errors.New("unable to upload *multipart.FileHeader bytes to S3")
+var (
+	ErrBoundaryValueMissing       = errors.New("request contained no boundary value in the Content-Type header")
+	ErrContentTypeHeaderMissing   = errors.New("request contained no Content-Type header")
+	ErrDownloadingS3File          = errors.New("unable to download the given file from S3")
+	ErrEmptyFileDownloaded        = errors.New("the provided S3 file to download is empty")
+	ErrNewAWSSession              = errors.New("error creating new AWS Session")
+	ErrOpeningMultiPartFile       = errors.New("unable to open *multipart.FileHeader")
+	ErrParameterBucketEmpty       = errors.New("required parameter bucket is empty")
+	ErrParameterNameEmpty         = errors.New("required parameter name is empty")
+	ErrParameterRegionEmpty       = errors.New("required parameter region is empty")
+	ErrParsingMediaType           = errors.New("error parsing media type from Content-Type header. Make sure your request is formatted correctly")
+	ErrReadingMultiPartFile       = errors.New("unable to read *multipart.FileHeader")
+	ErrReadingMultiPartForm       = errors.New("reading of multipart form failed. verify input size is <= maxFileSizeBytes")
+	ErrUploadingMultiPartFileToS3 = errors.New("unable to upload *multipart.FileHeader bytes to S3")
+)
 
 // GetFileHeadersFromLambdaReq accepts a lambda request directly from AWS Lambda after it has been proxied through
 // API Gateway. It returns an array of *multipart.FileHeader values. One for each file uploaded to Lambda.
