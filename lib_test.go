@@ -18,14 +18,16 @@ import (
 	"testing"
 )
 
-const Region = "us-east-2"
-const Name = "file_slash_key_name"
-const Bucket = "golang-s3-lambda-test"
-const BoundaryValue = "---SEAN_BOUNDARY_VALUE"
-const SampleFile = "sample_file.csv"
-const EmptyFile = "empty_file.txt"
-const SampleFileBytes = 369
-const MaxFileSizeBytes = 50000000 // 50 megabytes
+const (
+	Region           = "us-east-2"
+	Name             = "file_slash_key_name"
+	Bucket           = "golang-s3-lambda-test"
+	BoundaryValue    = "---SEAN_BOUNDARY_VALUE"
+	SampleFile       = "sample_file.csv"
+	EmptyFile        = "empty_file.txt"
+	SampleFileBytes  = 369
+	MaxFileSizeBytes = 50000000 // 50 megabytes
+)
 
 func TestMain(m *testing.M) {
 	setup()
