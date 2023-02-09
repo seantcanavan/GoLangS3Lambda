@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"mime"
 	"mime/multipart"
+	"net/http"
 	"path/filepath"
 	"strings"
 )
@@ -123,7 +124,15 @@ func Download(region, bucket, name string) ([]byte, error) {
 // API Gateway. It returns an array of *multipart.FileHeader values. One for each file uploaded to Lambda.
 func GetHeaders(lambdaReq events.APIGatewayProxyRequest, maxFileSizeBytes int64) ([]*multipart.FileHeader, error) {
 	//parse the lambda body
-	contentType := lambdaReq.Headers["Content-Type"]
+	// workaround for case-sensitive headers. thanks AWS!
+	// https://github.com/aws/aws-lambda-go/issues/117
+	headers := http.Header{}
+
+	for header, values := range lambdaReq.Headers {
+		headers.Add(header, values)
+	}
+
+	contentType := headers.Get("Content-Type")
 	if contentType == "" {
 		return nil, ErrContentTypeHeaderMissing
 	}
