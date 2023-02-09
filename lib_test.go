@@ -24,6 +24,7 @@ const (
 	MaxFileSizeBytes    = 50000000 // 50 megabytes
 	Region              = "us-east-2"
 	S3Bucket            = "golang-s3-lambda-test"
+	S3DeleteFileName    = "delete_me_dude"
 	S3FileName          = "file_slash_key_name"
 	SampleFileName      = "sample_file.csv"
 	SampleFileSizeBytes = 369
@@ -41,58 +42,52 @@ func setup() {
 	}
 }
 
-func TestGetFileHeadersFromLambdaReq(t *testing.T) {
-	t.Run("verify err when Content-Type header not set", func(t *testing.T) {
-		lambdaReq := generateUploadFileReq()
-		lambdaReq.Headers = map[string]string{}
+func TestDelete(t *testing.T) {
+	lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
-		assert.Equal(t, len(fileHeaders), 0)
-		assert.True(t, errors.Is(err, ErrContentTypeHeaderMissing))
-	})
-	t.Run("verify err when content type is invalid", func(t *testing.T) {
-		lambdaReq := generateUploadFileReq()
-		lambdaReq.Headers = map[string]string{"Content-Type": ";;;;;;;;;"}
+	fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
+	assert.Nil(t, err)
+	assert.Equal(t, 1, len(fileHeaders))
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
-		assert.Equal(t, len(fileHeaders), 0)
-		assert.True(t, errors.Is(err, ErrParsingMediaType))
-	})
-	t.Run("verify err when content type has no boundary value", func(t *testing.T) {
-		lambdaReq := generateUploadFileReq()
-		lambdaReq.Headers = map[string]string{"Content-Type": "blah"}
+	uploadRes, err := UploadHeader(fileHeaders[0], Region, S3Bucket, S3DeleteFileName)
+	assert.Nil(t, err)
+	assert.Equal(t, filepath.Join(S3Bucket, S3DeleteFileName), uploadRes.S3Path)
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
-		assert.Equal(t, len(fileHeaders), 0)
-		assert.True(t, errors.Is(err, ErrBoundaryValueMissing))
-	})
-	t.Run("verify get headers works with correct inputs", func(t *testing.T) {
-		lambdaReq := generateUploadFileReq()
+	var urlBuilder strings.Builder
+	urlBuilder.WriteString("https://")
+	urlBuilder.WriteString(S3Bucket)
+	urlBuilder.WriteString(".s3.")
+	urlBuilder.WriteString(Region)
+	urlBuilder.WriteString(".amazonaws.com/")
+	urlBuilder.WriteString(S3DeleteFileName)
+	assert.Equal(t, urlBuilder.String(), uploadRes.S3URL)
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
-		assert.Nil(t, err)
-		assert.Equal(t, 1, len(fileHeaders))
-	})
+	deleteErr := Delete(Region, S3Bucket, S3DeleteFileName)
+	assert.Nil(t, deleteErr)
+
+	_, downloadErr := Download(Region, S3Bucket, S3DeleteFileName)
+	assert.NotNil(t, downloadErr)
+	assert.True(t, errors.Is(ErrDownloadingS3File, downloadErr))
 }
 
-func TestDownloadFileFromS3(t *testing.T) {
+func TestDownload(t *testing.T) {
 	t.Run("verify err when region is empty", func(t *testing.T) {
-		fileBytes, err := DownloadFileFromS3("", S3Bucket, S3FileName)
+		fileBytes, err := Download("", S3Bucket, S3FileName)
 		assert.Equal(t, len(fileBytes), 0)
 		assert.True(t, errors.Is(err, ErrParameterRegionEmpty))
 	})
 	t.Run("verify err when bucket is empty", func(t *testing.T) {
-		fileBytes, err := DownloadFileFromS3(Region, "", S3FileName)
+		fileBytes, err := Download(Region, "", S3FileName)
 		assert.Equal(t, len(fileBytes), 0)
 		assert.True(t, errors.Is(err, ErrParameterBucketEmpty))
 	})
 	t.Run("verify err when name is empty", func(t *testing.T) {
-		fileBytes, err := DownloadFileFromS3(Region, S3Bucket, "")
+		fileBytes, err := Download(Region, S3Bucket, "")
 		assert.Equal(t, len(fileBytes), 0)
 		assert.True(t, errors.Is(err, ErrParameterNameEmpty))
 	})
 	t.Run("verify err when region is invalid", func(t *testing.T) {
-		fileBytes, err := DownloadFileFromS3("us-east-sean", S3Bucket, S3FileName)
+		fileBytes, err := Download("us-east-sean", S3Bucket, S3FileName)
 		assert.Equal(t, len(fileBytes), 0)
 		assert.True(t, errors.Is(err, ErrDownloadingS3File))
 	})
@@ -115,75 +110,109 @@ func TestDownloadFileFromS3(t *testing.T) {
 		})
 		assert.Nil(t, err)
 
-		fileBytes, err := DownloadFileFromS3(Region, S3Bucket, EmptyFileName)
+		fileBytes, err := Download(Region, S3Bucket, EmptyFileName)
 		assert.Equal(t, len(fileBytes), 0)
 		assert.True(t, errors.Is(err, ErrEmptyFileDownloaded))
 	})
-	t.Run("verify download works with correct inputs", func(t *testing.T) {
-		fileBytes, err := DownloadFileFromS3(Region, S3Bucket, S3FileName)
+	t.Run("verify Download works with correct inputs", func(t *testing.T) {
+		fileBytes, err := Download(Region, S3Bucket, S3FileName)
 		assert.Equal(t, len(fileBytes), SampleFileSizeBytes)
 		assert.Nil(t, err)
 	})
 }
 
-func TestUploadFileHeaderToS3(t *testing.T) {
+func TestGetHeaders(t *testing.T) {
+	t.Run("verify err when Content-Type header not set", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+		lambdaReq.Headers = map[string]string{}
+
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
+		assert.Equal(t, len(fileHeaders), 0)
+		assert.True(t, errors.Is(err, ErrContentTypeHeaderMissing))
+	})
+	t.Run("verify err when content type is invalid", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+		lambdaReq.Headers = map[string]string{"Content-Type": ";;;;;;;;;"}
+
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
+		assert.Equal(t, len(fileHeaders), 0)
+		assert.True(t, errors.Is(err, ErrParsingMediaType))
+	})
+	t.Run("verify err when content type has no boundary value", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+		lambdaReq.Headers = map[string]string{"Content-Type": "blah"}
+
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
+		assert.Equal(t, len(fileHeaders), 0)
+		assert.True(t, errors.Is(err, ErrBoundaryValueMissing))
+	})
+	t.Run("verify GetHeaders works with correct inputs", func(t *testing.T) {
+		lambdaReq := generateUploadFileReq()
+
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(fileHeaders))
+	})
+}
+
+func TestUploadHeader(t *testing.T) {
 	t.Run("verify err when region is empty", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
-		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], "", S3Bucket, S3FileName)
+		uploadRes, err := UploadHeader(fileHeaders[0], "", S3Bucket, S3FileName)
 		assert.Equal(t, uploadRes, (*UploadRes)(nil))
 		assert.True(t, errors.Is(err, ErrParameterRegionEmpty))
 	})
 	t.Run("verify err when bucket is empty", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
-		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], Region, "", S3FileName)
+		uploadRes, err := UploadHeader(fileHeaders[0], Region, "", S3FileName)
 		assert.Equal(t, uploadRes, (*UploadRes)(nil))
 		assert.True(t, errors.Is(err, ErrParameterBucketEmpty))
 	})
 	t.Run("verify err when name is empty", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
-		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], Region, S3Bucket, "")
+		uploadRes, err := UploadHeader(fileHeaders[0], Region, S3Bucket, "")
 		assert.Equal(t, uploadRes, (*UploadRes)(nil))
 		assert.True(t, errors.Is(err, ErrParameterNameEmpty))
 	})
 	t.Run("verify err when *multipart.FileHeader is empty", func(t *testing.T) {
-		uploadRes, err := UploadFileHeaderToS3(&multipart.FileHeader{}, Region, S3Bucket, S3FileName)
+		uploadRes, err := UploadHeader(&multipart.FileHeader{}, Region, S3Bucket, S3FileName)
 		assert.Equal(t, uploadRes, (*UploadRes)(nil))
 		assert.True(t, errors.Is(err, ErrOpeningMultiPartFile))
 	})
 	t.Run("verify err when region is invalid and upload fails", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
-		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], "us-east-sean", S3Bucket, S3FileName)
+		uploadRes, err := UploadHeader(fileHeaders[0], "us-east-sean", S3Bucket, S3FileName)
 		assert.Equal(t, uploadRes, (*UploadRes)(nil))
 		assert.True(t, errors.Is(err, ErrUploadingMultiPartFileToS3))
 	})
-	t.Run("verify upload works with correct inputs", func(t *testing.T) {
+	t.Run("verify UploadHeader works with correct inputs", func(t *testing.T) {
 		lambdaReq := generateUploadFileReq()
 
-		fileHeaders, err := GetFileHeadersFromLambdaReq(lambdaReq, MaxFileSizeBytes)
+		fileHeaders, err := GetHeaders(lambdaReq, MaxFileSizeBytes)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, len(fileHeaders))
 
-		uploadRes, err := UploadFileHeaderToS3(fileHeaders[0], Region, S3Bucket, S3FileName)
+		uploadRes, err := UploadHeader(fileHeaders[0], Region, S3Bucket, S3FileName)
 		assert.Nil(t, err)
 		assert.Equal(t, filepath.Join(S3Bucket, S3FileName), uploadRes.S3Path)
 

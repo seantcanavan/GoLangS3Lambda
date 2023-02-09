@@ -1,5 +1,5 @@
 # Lambda S3
-Upload or Download files from AWS S3 with one function through AWS Lambda and AWS APIGateway.
+Upload, Download, or Delete files from AWS S3 with one function through AWS Lambda and AWS APIGateway.
 
 ## How to Build locally
 1. `make build`
@@ -12,11 +12,12 @@ Upload or Download files from AWS S3 with one function through AWS Lambda and AW
 ## How to Use
 1. `go get github.com/seantcanavan/lambda_s3@latest`
 2. `import github.com/seantcanavan/lambda_s3`
-3. Get the file headers uploaded via AWS Lambda / API Gateway: `headers, err := lambda_s3.GetFileHeadersFromLambdaReq()`
-4. Upload the uploaded file contents via the file headers: `lambda_s3.UploadFileHeaderToS3()`
-5. Download the file contents via the file's bucket/key combination: `lambda_s3.DownloadFileFromS3()`
-6. Use `errors.Is` to check for different error cases returned from `GetFileHeadersFromLambdaReq`, `UploadFileHeaderToS3`, and `DownloadFileFromS3`
+3. Get the file headers uploaded via AWS Lambda / API Gateway: `headers, err := lambda_s3.GetHeaders()`
+4. Upload the uploaded file contents via the file headers: `lambda_s3.UploadHeader(header[0], region, bucket, name)`
+5. Download the file contents via the file's bucket/key combination: `lambda_s3.Download()`
+6. Use `errors.Is` to check for different error cases returned from `GetHeaders`, `UploadHeader`, `Download`, and `Delete`
    1. Check below for sample code on how to implement the functions and use `errors.Is`
+7. Delete the uploaded file via the values returned from Upload: `lambda_s3.Delete(region, bucket,name)`
 
 ## Sample Upload Lambda Handler Example
 ``` go
@@ -100,9 +101,22 @@ func DownloadLambda(ctx context.Context, lambdaReq events.APIGatewayProxyRequest
 
 ## All tests are passing
 ```
- func TestDownloadFileFromS3(t *testing.T) {
-Thu Jan 19 05:39 PM lambda_s3: make test
-go test -v
+=== RUN   TestDelete
+--- PASS: TestDelete (0.43s)
+=== RUN   TestDownloadFileFromS3
+=== RUN   TestDownloadFileFromS3/verify_err_when_region_is_empty
+=== RUN   TestDownloadFileFromS3/verify_err_when_bucket_is_empty
+=== RUN   TestDownloadFileFromS3/verify_err_when_name_is_empty
+=== RUN   TestDownloadFileFromS3/verify_err_when_region_is_invalid
+=== RUN   TestDownloadFileFromS3/verify_err_when_target_file_is_empty
+=== RUN   TestDownloadFileFromS3/verify_download_works_with_correct_inputs
+--- PASS: TestDownloadFileFromS3 (0.62s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_empty (0.00s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_bucket_is_empty (0.00s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_name_is_empty (0.00s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_invalid (0.48s)
+    --- PASS: TestDownloadFileFromS3/verify_err_when_target_file_is_empty (0.10s)
+    --- PASS: TestDownloadFileFromS3/verify_download_works_with_correct_inputs (0.05s)
 === RUN   TestGetFileHeadersFromLambdaReq
 === RUN   TestGetFileHeadersFromLambdaReq/verify_err_when_Content-Type_header_not_set
 === RUN   TestGetFileHeadersFromLambdaReq/verify_err_when_content_type_is_invalid
@@ -113,20 +127,6 @@ go test -v
     --- PASS: TestGetFileHeadersFromLambdaReq/verify_err_when_content_type_is_invalid (0.00s)
     --- PASS: TestGetFileHeadersFromLambdaReq/verify_err_when_content_type_has_no_boundary_value (0.00s)
     --- PASS: TestGetFileHeadersFromLambdaReq/verify_get_headers_works_with_correct_inputs (0.00s)
-=== RUN   TestDownloadFileFromS3
-=== RUN   TestDownloadFileFromS3/verify_err_when_region_is_empty
-=== RUN   TestDownloadFileFromS3/verify_err_when_bucket_is_empty
-=== RUN   TestDownloadFileFromS3/verify_err_when_name_is_empty
-=== RUN   TestDownloadFileFromS3/verify_err_when_region_is_invalid
-=== RUN   TestDownloadFileFromS3/verify_err_when_target_file_is_empty
-=== RUN   TestDownloadFileFromS3/verify_download_works_with_correct_inputs
---- PASS: TestDownloadFileFromS3 (0.99s)
-    --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_empty (0.00s)
-    --- PASS: TestDownloadFileFromS3/verify_err_when_bucket_is_empty (0.00s)
-    --- PASS: TestDownloadFileFromS3/verify_err_when_name_is_empty (0.00s)
-    --- PASS: TestDownloadFileFromS3/verify_err_when_region_is_invalid (0.57s)
-    --- PASS: TestDownloadFileFromS3/verify_err_when_target_file_is_empty (0.32s)
-    --- PASS: TestDownloadFileFromS3/verify_download_works_with_correct_inputs (0.10s)
 === RUN   TestUploadFileHeaderToS3
 === RUN   TestUploadFileHeaderToS3/verify_err_when_region_is_empty
 === RUN   TestUploadFileHeaderToS3/verify_err_when_bucket_is_empty
@@ -134,13 +134,13 @@ go test -v
 === RUN   TestUploadFileHeaderToS3/verify_err_when_*multipart.FileHeader_is_empty
 === RUN   TestUploadFileHeaderToS3/verify_err_when_region_is_invalid_and_upload_fails
 === RUN   TestUploadFileHeaderToS3/verify_upload_works_with_correct_inputs
---- PASS: TestUploadFileHeaderToS3 (0.55s)
+--- PASS: TestUploadFileHeaderToS3 (0.78s)
     --- PASS: TestUploadFileHeaderToS3/verify_err_when_region_is_empty (0.00s)
     --- PASS: TestUploadFileHeaderToS3/verify_err_when_bucket_is_empty (0.00s)
     --- PASS: TestUploadFileHeaderToS3/verify_err_when_name_is_empty (0.00s)
     --- PASS: TestUploadFileHeaderToS3/verify_err_when_*multipart.FileHeader_is_empty (0.00s)
-    --- PASS: TestUploadFileHeaderToS3/verify_err_when_region_is_invalid_and_upload_fails (0.49s)
-    --- PASS: TestUploadFileHeaderToS3/verify_upload_works_with_correct_inputs (0.06s)
+    --- PASS: TestUploadFileHeaderToS3/verify_err_when_region_is_invalid_and_upload_fails (0.71s)
+    --- PASS: TestUploadFileHeaderToS3/verify_upload_works_with_correct_inputs (0.07s)
 PASS
-ok  	github.com/seantcanavan/lambda_s3	1.538s
+ok  	github.com/seantcanavan/lambda_s3	1.838s
 ```

@@ -34,47 +34,47 @@ var (
 	ErrUploadingMultiPartFileToS3 = errors.New("unable to upload *multipart.FileHeader bytes to S3")
 )
 
-// GetFileHeadersFromLambdaReq accepts a lambda request directly from AWS Lambda after it has been proxied through
-// API Gateway. It returns an array of *multipart.FileHeader values. One for each file uploaded to Lambda.
-func GetFileHeadersFromLambdaReq(lambdaReq events.APIGatewayProxyRequest, maxFileSizeBytes int64) ([]*multipart.FileHeader, error) {
-	//parse the lambda body
-	contentType := lambdaReq.Headers["Content-Type"]
-	if contentType == "" {
-		return nil, ErrContentTypeHeaderMissing
+func Delete(region, bucket, name string) error {
+	if region == "" {
+		return ErrParameterRegionEmpty
 	}
 
-	_, params, err := mime.ParseMediaType(contentType)
+	if bucket == "" {
+		return ErrParameterBucketEmpty
+	}
+
+	if name == "" {
+		return ErrParameterNameEmpty
+	}
+
+	awsSession, err := session.NewSession(&aws.Config{
+		Region: aws.String(region)},
+	)
 	if err != nil {
-		return nil, ErrParsingMediaType
+		return ErrNewAWSSession
 	}
 
-	boundary := params["boundary"]
-	if boundary == "" {
-		return nil, ErrBoundaryValueMissing
+	batcher := s3manager.NewBatchDelete(awsSession, func(batchDelete *s3manager.BatchDelete) {
+		batchDelete.BatchSize = 1
+	})
+
+	objects := []s3manager.BatchDeleteObject{
+		{
+			Object: &s3.DeleteObjectInput{
+				Key:    aws.String(name),
+				Bucket: aws.String(bucket),
+			},
+		},
 	}
 
-	stringReader := strings.NewReader(lambdaReq.Body)
-	multipartReader := multipart.NewReader(stringReader, boundary)
-
-	form, err := multipartReader.ReadForm(maxFileSizeBytes)
-	if err != nil {
-		return nil, ErrReadingMultiPartForm
-	}
-
-	var files []*multipart.FileHeader
-
-	for currentFileName := range form.File {
-		files = append(files, form.File[currentFileName][0])
-	}
-
-	return files, nil
+	return batcher.Delete(aws.BackgroundContext(), &s3manager.DeleteObjectsIterator{Objects: objects})
 }
 
-// DownloadFileFromS3 accepts an AWS Region, the name of an S3 bucket, and the key or name of a file to download.
+// Download accepts an AWS Region, the name of an S3 bucket, and the key or name of a file to download.
 // It will create a new AWS Session in the specified region and proceed to try to download the file.
 // All three parameters, region, bucket, and name are required.
 // If the download is successful, it will return a byte array containing the bytes for the file.
-func DownloadFileFromS3(region, bucket, name string) ([]byte, error) {
+func Download(region, bucket, name string) ([]byte, error) {
 	if region == "" {
 		return nil, ErrParameterRegionEmpty
 	}
@@ -119,14 +119,50 @@ func DownloadFileFromS3(region, bucket, name string) ([]byte, error) {
 	return writeAtBuffer.Bytes(), nil
 }
 
+// GetHeaders accepts a lambda request directly from AWS Lambda after it has been proxied through
+// API Gateway. It returns an array of *multipart.FileHeader values. One for each file uploaded to Lambda.
+func GetHeaders(lambdaReq events.APIGatewayProxyRequest, maxFileSizeBytes int64) ([]*multipart.FileHeader, error) {
+	//parse the lambda body
+	contentType := lambdaReq.Headers["Content-Type"]
+	if contentType == "" {
+		return nil, ErrContentTypeHeaderMissing
+	}
+
+	_, params, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return nil, ErrParsingMediaType
+	}
+
+	boundary := params["boundary"]
+	if boundary == "" {
+		return nil, ErrBoundaryValueMissing
+	}
+
+	stringReader := strings.NewReader(lambdaReq.Body)
+	multipartReader := multipart.NewReader(stringReader, boundary)
+
+	form, err := multipartReader.ReadForm(maxFileSizeBytes)
+	if err != nil {
+		return nil, ErrReadingMultiPartForm
+	}
+
+	var files []*multipart.FileHeader
+
+	for currentFileName := range form.File {
+		files = append(files, form.File[currentFileName][0])
+	}
+
+	return files, nil
+}
+
 type UploadRes struct {
 	S3Path string
 	S3URL  string
 }
 
-// UploadFileHeaderToS3 takes a single *multipart.FileHeader from the Lambda request and uploads it to S3.
+// UploadHeader takes a single *multipart.FileHeader from the Lambda request and uploads it to S3.
 // It the upload is successful it returns the full path to the file in S3 as well as the URL for web access in UploadRes.
-func UploadFileHeaderToS3(fileHeader *multipart.FileHeader, region, bucket, name string) (*UploadRes, error) {
+func UploadHeader(fileHeader *multipart.FileHeader, region, bucket, name string) (*UploadRes, error) {
 	if region == "" {
 		return nil, ErrParameterRegionEmpty
 	}
