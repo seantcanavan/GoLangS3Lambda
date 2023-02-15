@@ -2,6 +2,7 @@ package lambda_s3
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/aws/aws-lambda-go/events"
@@ -242,8 +243,8 @@ func generateUploadFileReq() events.APIGatewayProxyRequest {
 		log.Panicf("should get exactly [%d] bytes from [%s]", SampleFileSizeBytes, SampleFileName)
 	}
 
-	var multiPartBytes bytes.Buffer
-	writer := multipart.NewWriter(&multiPartBytes)
+	var multiPartBuffer bytes.Buffer
+	writer := multipart.NewWriter(&multiPartBuffer)
 	boundaryErr := writer.SetBoundary(BoundaryValue)
 	if boundaryErr != nil {
 		fmt.Println(fmt.Sprintf("boundaryErr [%+v]", boundaryErr))
@@ -275,7 +276,7 @@ func generateUploadFileReq() events.APIGatewayProxyRequest {
 
 	return events.APIGatewayProxyRequest{
 		Headers:         map[string]string{"Content-Type": contentType},
-		Body:            string(multiPartBytes.Bytes()),
-		IsBase64Encoded: false,
+		Body:            base64.StdEncoding.EncodeToString(multiPartBuffer.Bytes()),
+		IsBase64Encoded: true,
 	}
 }
