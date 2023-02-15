@@ -13,6 +13,7 @@ Upload, Download, or Delete files from AWS S3 with one function through AWS Lamb
 1. `go get github.com/seantcanavan/lambda_s3@latest`
 2. `import github.com/seantcanavan/lambda_s3`
 3. Get the file headers uploaded via AWS Lambda / API Gateway: `headers, err := lambda_s3.GetHeaders()`
+   1. Make sure to check the value of APIGatewayProxyRequest.IsBase64Encoded and make sure it matches the form body contents
 4. Upload the uploaded file contents via the file headers: `lambda_s3.UploadHeader(header[0], region, bucket, name)`
 5. Download the file contents via the file's bucket/key combination: `lambda_s3.Download()`
 6. Use `errors.Is` to check for different error cases returned from `GetHeaders`, `UploadHeader`, `Download`, and `Delete`

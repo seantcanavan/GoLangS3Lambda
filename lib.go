@@ -6,12 +6,14 @@
 package lambda_s3
 
 import (
+	"encoding/base64"
 	"errors"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
@@ -147,8 +149,15 @@ func GetHeaders(lambdaReq events.APIGatewayProxyRequest, maxFileSizeBytes int64)
 		return nil, ErrBoundaryValueMissing
 	}
 
-	stringReader := strings.NewReader(lambdaReq.Body)
-	multipartReader := multipart.NewReader(stringReader, boundary)
+	var readerImpl io.Reader
+	stringReader := strings.NewReader(lambdaReq.Body) // default to a string reader to read the body contents
+	readerImpl = stringReader
+	if lambdaReq.IsBase64Encoded {
+		b64Reader := base64.NewDecoder(base64.StdEncoding, stringReader) // if the lambda isBase64Encoded then we need the base64 decoder
+		readerImpl = b64Reader
+	}
+
+	multipartReader := multipart.NewReader(readerImpl, boundary)
 
 	form, err := multipartReader.ReadForm(maxFileSizeBytes)
 	if err != nil {
