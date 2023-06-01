@@ -8,6 +8,7 @@ package lambda_s3
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -161,6 +162,7 @@ func GetHeaders(lambdaReq events.APIGatewayProxyRequest, maxFileSizeBytes int64)
 
 	form, err := multipartReader.ReadForm(maxFileSizeBytes)
 	if err != nil {
+		fmt.Println(fmt.Sprintf("err is [%+v]", err))
 		return nil, ErrReadingMultiPartForm
 	}
 
